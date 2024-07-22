@@ -121,8 +121,8 @@ with customer_info as(
 	select 
 	    p.customer_id,
 	    c3.country,
-	    count(p.payment_id) AS total_rentals,
-	    sum(p.amount) AS total_amount,
+	    count(p.payment_id) AS cont_rentals,
+	    sum(p.amount) AS sum_amount,
 	    max(p.payment_date) AS last_rental_date
 	from payment p
 	left join customer c on p.customer_id = c.customer_id
@@ -130,17 +130,117 @@ with customer_info as(
 	left join city c2 on a.city_id = c2.city_id
 	left join country c3 on c2.country_id = c3.country_id
 	group by p.customer_id, c3.country
-)	
-
-select 
-	p.*,
-	count(p.payment_id) over (partition by p.customer_id) as cnt
-from payment p
-left join customer c on p.customer_id = c.customer_id
-left join address a on c.address_id = a.address_id
-left join city c2 on a.city_id = c2.city_id
-left join country c3 on c2.country_id = c3.country_id
-where cnt = customer_info.total_rentals --почему не сработало , из за порядка следования частей запроса?
+),
+max_numbers_rentals as(
+	select 
+		max(cont_rentals) as max_count_rentals,
+		max(sum_amount) as max_sum_amount,
+		max(last_rental_date)::date as max_date_rental
+	from customer_info
+)
 
 
+-- 1. покупатель, арендовавший наибольшее количество фильмов
+select *
+from (
+	select
+		p.customer_id,
+		c.first_name,
+		c.last_name,
+	    c3.country,
+	    count(p.payment_id) over(partition by p.customer_id) as new_cont_rentals,
+	    sum(p.amount) over(partition by p.customer_id) AS new_sum_amount,
+	    max(p.payment_date) over(partition by p.customer_id) AS new_last_rental_date
+	from payment p
+		left join customer c on p.customer_id = c.customer_id
+		left join address a on c.address_id = a.address_id
+		left join city c2 on a.city_id = c2.city_id
+		left join country c3 on c2.country_id = c3.country_id
+) as x, max_numbers_rentals
+where new_cont_rentals = max_numbers_rentals.max_count_rentals
+	
+ 
+-- 2. покупатель, арендовавший фильмов на самую большую сумму
+with customer_info as(
+	select 
+	    p.customer_id,
+	    c3.country,
+	    count(p.payment_id) AS cont_rentals,
+	    sum(p.amount) AS sum_amount,
+	    max(p.payment_date) AS last_rental_date
+	from payment p
+	left join customer c on p.customer_id = c.customer_id
+	left join address a on c.address_id = a.address_id
+	left join city c2 on a.city_id = c2.city_id
+	left join country c3 on c2.country_id = c3.country_id
+	group by p.customer_id, c3.country
+),
+max_numbers_rentals as(
+	select 
+		max(cont_rentals) as max_count_rentals,
+		max(sum_amount) as max_sum_amount,
+		max(last_rental_date)::date as max_date_rental
+	from customer_info
+)
 
+select *
+from (
+	select
+		p.customer_id,
+		c.first_name,
+		c.last_name,
+	    c3.country,
+	    count(p.payment_id) over(partition by p.customer_id) as new_cont_rentals,
+	    sum(p.amount) over(partition by p.customer_id) AS new_sum_amount,
+	    max(p.payment_date) over(partition by p.customer_id) AS new_last_rental_date
+	from payment p
+		left join customer c on p.customer_id = c.customer_id
+		left join address a on c.address_id = a.address_id
+		left join city c2 on a.city_id = c2.city_id
+		left join country c3 on c2.country_id = c3.country_id
+) as x, max_numbers_rentals
+where new_sum_amount = max_numbers_rentals.max_sum_amount
+
+
+
+-- 3. покупатель, который последним арендовал фильм
+with customer_info as(
+	select 
+	    p.customer_id,
+	    c3.country,
+	    count(p.payment_id) AS cont_rentals,
+	    sum(p.amount) AS sum_amount,
+	    max(p.payment_date) AS last_rental_date
+	from payment p
+	left join customer c on p.customer_id = c.customer_id
+	left join address a on c.address_id = a.address_id
+	left join city c2 on a.city_id = c2.city_id
+	left join country c3 on c2.country_id = c3.country_id
+	group by p.customer_id, c3.country
+),
+max_numbers_rentals as(
+	select 
+		max(cont_rentals) as max_count_rentals,
+		max(sum_amount) as max_sum_amount,
+		max(last_rental_date)::date as max_date_rental
+	from customer_info
+)
+
+
+select *
+from (
+	select
+		p.customer_id,
+		c.first_name,
+		c.last_name,
+	    c3.country,
+	    count(p.payment_id) over(partition by p.customer_id) as new_cont_rentals,
+	    sum(p.amount) over(partition by p.customer_id) AS new_sum_amount,
+	    max(p.payment_date) over(partition by p.customer_id) AS new_last_rental_date
+	from payment p
+		left join customer c on p.customer_id = c.customer_id
+		left join address a on c.address_id = a.address_id
+		left join city c2 on a.city_id = c2.city_id
+		left join country c3 on c2.country_id = c3.country_id
+) as x, max_numbers_rentals
+where new_last_rental_date::date = max_numbers_rentals.max_date_rental
