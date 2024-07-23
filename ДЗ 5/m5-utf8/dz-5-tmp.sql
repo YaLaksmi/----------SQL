@@ -249,6 +249,58 @@ where new_last_rental_date::date = max_numbers_rentals.max_date_rental
 
 
 
-
+--new
+WITH customer_info AS (
+    SELECT 
+        p.customer_id,
+        c3.country,
+        COUNT(p.payment_id) AS rental_count,
+        SUM(p.amount) AS total_amount,
+        MAX(p.payment_date) AS last_rental_date,
+        c.first_name || ' ' || c.last_name AS customer_name
+    FROM payment p
+    LEFT JOIN customer c ON p.customer_id = c.customer_id
+    LEFT JOIN address a ON c.address_id = a.address_id
+    LEFT JOIN city c2 ON a.city_id = c2.city_id
+    LEFT JOIN country c3 ON c2.country_id = c3.country_id
+    GROUP BY p.customer_id, c3.country, c.first_name, c.last_name
+),
+max_rentals AS (
+    SELECT 
+        country,
+        MAX(rental_count) AS max_rental_count
+    FROM customer_info
+    GROUP BY country
+),
+max_amounts AS (
+    SELECT 
+        country,
+        MAX(total_amount) AS max_total_amount
+    FROM customer_info
+    GROUP BY country
+),
+latest_rentals AS (
+    SELECT 
+        country,
+        MAX(last_rental_date) AS max_last_rental_date
+    FROM customer_info
+    GROUP BY country
+)
+SELECT 
+    ci1.country,
+    MAX(CASE WHEN ci1.rental_count = mr.max_rental_count THEN ci1.customer_name END) AS most_rentals_customer,
+    MAX(CASE WHEN ci2.total_amount = ma.max_total_amount THEN ci2.customer_name END) AS highest_amount_customer,
+    MAX(CASE WHEN ci3.last_rental_date = lr.max_last_rental_date THEN ci3.customer_name END) AS last_rental_customer
+FROM 
+    customer_info ci1
+    LEFT JOIN max_rentals mr ON ci1.country = mr.country
+    LEFT JOIN customer_info ci2 ON ci1.country = ci2.country AND ci1.customer_id = ci2.customer_id
+    LEFT JOIN max_amounts ma ON ci2.country = ma.country
+    LEFT JOIN customer_info ci3 ON ci1.country = ci3.country AND ci1.customer_id = ci3.customer_id
+    LEFT JOIN latest_rentals lr ON ci3.country = lr.country
+GROUP BY 
+    ci1.country
+ORDER BY 
+    ci1.country;
 
 
